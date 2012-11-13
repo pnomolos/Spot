@@ -554,7 +554,17 @@ class Mapper
 
         if(is_array($conditions)) {
             $conditions = array(0 => array('conditions' => $conditions));
-            return $this->connection($entityName)->delete($this->datasource($entityName), $conditions, $options);
+            if (method_exists($entityName, 'beforeDelete')) {
+              $check = $entityName::beforeDeleteConditions($this, $conditions, $options);
+              if (!$check) {
+                return false;
+              }
+            }
+            $result = $this->connection($entityName)->delete($this->datasource($entityName), $conditions, $options);
+            if ($result && method_exists($entityName, 'afterDelete')) {
+              $result = $entityName::afterDeleteConditions($this, $conditions, $options);
+            }
+            return $result;
         } else {
             throw new $this->_exceptionClass(__METHOD__ . " conditions must be an array, given " . gettype($conditions) . "");
         }
