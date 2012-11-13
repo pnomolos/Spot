@@ -555,14 +555,14 @@ class Mapper
         if(is_array($conditions)) {
             $conditions = array(0 => array('conditions' => $conditions));
             if (method_exists($entityName, 'beforeDeleteConditions')) {
-                $check = $entityName::beforeDeleteConditions($this, $conditions, $options);
+                $check = $entityName::beforeDeleteConditions($this, $conditions[0]['conditions'], $options);
                 if (!$check) {
                     return false;
                 }
             }
             $result = $this->connection($entityName)->delete($this->datasource($entityName), $conditions, $options);
             if ($result && method_exists($entityName, 'afterDeleteConditions')) {
-                $result = $entityName::afterDeleteConditions($this, $conditions, $options);
+                $result = $entityName::afterDeleteConditions($this, $conditions[0]['conditions'], $options);
             }
             return $result;
         } else {
