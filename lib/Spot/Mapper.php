@@ -423,6 +423,72 @@ class Mapper
 
 
     /**
+     * Save nested record - iterates over relationships and saves them as well
+     * Will update if primary key found, insert if not
+     * Performs validation automatically before saving record
+     *
+     * @param string $entityName Name of entity to save
+     * @param mixed $data Array of field => value pairs
+     * @param array $options Array of adapter-specific options
+     */
+    public function saveNested($entityName, array $data = array(), array $options = array())
+    {
+        $baseObject = new $entityName($data);
+        $saveResult = true;
+        $savedNested = true;
+        if($saveResult = $this->save($baseObject)) {
+            // Saved the parent, try the relationships now
+            foreach($entityName::relations() as $relationName => $relationOptions) {
+                if (!$savedNested) {
+                    // No point continuing if we failed earlier
+                    break;
+                }
+                if(isset($data[$relationName])) {
+                    $relationData = $data[$relationName];
+                    switch ($relationOptions['type']) {
+                        case 'HasOne':
+                            foreach($relationOptions['where'] as $key => $value) {
+                                if(strpos(':entity.', $value) !== 0) {
+                                    $valueField = str_replace(':entity.', '', $value);
+                                    $relationData[$key] = $baseObject->$valueField;
+                                }
+                            }
+                            $savedNested = !!$this->saveNested($relationOptions['entity'], $relationData, $options);
+                            break;
+                        case 'HasMany':
+                            $savedEntities = array();
+                            foreach($relationData as $relatedData) {
+                                foreach($relationOptions['where'] as $key => $value) {
+                                    if(strpos(':entity.', $value) !== 0) {
+                                        $valueField = str_replace(':entity.', '', $value);
+                                        $relatedData[$key] = $baseObject->$valueField;
+                                    }
+                                }
+                                $savedEntities[] = $this->saveNested($relationOptions['entity'], $relatedData, $options);
+                            }
+                            if (count($relationData) != count(array_filter($savedEntities))) {
+                                $savedNested = false;
+                                $savedEntities = $this->all($relationOptions['entity'], array($this->primaryKeyField($relationOptions['entity']) => $savedEntities));
+                                foreach ($savedEntities as $savedEntity) {
+                                    $this->delete($savedEntity);
+                                }
+                            }
+                            break;
+                        case 'HasManyThrough':
+                            // TODO: Not supported yet
+                            return false;
+                    }
+                }
+            }
+            if (!$savedNested) {
+                $this->delete($baseObject);
+            }
+        }
+        return $savedNested ? $saveResult : false;
+    }
+
+
+    /**
      * Insert record
      *
      * @param mixed $entity Entity object or array of field => value pairs

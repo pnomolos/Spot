@@ -28,6 +28,11 @@ class Entity_Post extends \Spot\Entity
                 'entity' => 'Entity_Post_Comment',
                 'where' => array('post_id' => ':entity.id'),
                 'order' => array('date_created' => 'ASC')
+            ),
+            'author' => array(
+                'type' => 'HasOne',
+                'entity' => 'Entity_Author',
+                'where' => array('post_id' => ':entity.id')
             )
         );
     }

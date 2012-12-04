@@ -20,4 +20,14 @@ class Entity_Post_Comment extends \Spot\Entity
             'date_created' => array('type' => 'datetime')
         );
     }
+
+    public static function relations() {
+        return array(
+            'post' => array(
+                'type' => 'HasOne',
+                'entity' => 'Entity_Post',
+                'where' => array('id' => ':entity.post_id')
+            )
+        );
+    }
 }
