@@ -13,6 +13,8 @@ class Test_AdvancedCRUD extends PHPUnit_Framework_TestCase
         $mapper->migrate('Entity_Post');
         $mapper->migrate('Entity_Post_Comment');
         $mapper->migrate('Entity_Author');
+        $mapper->migrate('Entity_Post_Widget');
+        $mapper->migrate('Entity_Post_PostsWidgets');
     }
     public function setUp()
     {
@@ -20,6 +22,8 @@ class Test_AdvancedCRUD extends PHPUnit_Framework_TestCase
         $mapper->truncateDatasource('Entity_Post');
         $mapper->truncateDatasource('Entity_Post_Comment');
         $mapper->truncateDatasource('Entity_Author');
+        $mapper->truncateDatasource('Entity_Post_Widget');
+        $mapper->truncateDatasource('Entity_Post_PostsWidgets');
     }
 
     public function testNestedSaveHasOne()
@@ -116,5 +120,113 @@ class Test_AdvancedCRUD extends PHPUnit_Framework_TestCase
         // Make sure no comments were actually saved
         $comments = $mapper->all('Entity_Post_Comment');
         $this->assertSame(0, $comments->count());
+    }
+
+
+    public function testNestedSaveHasManyThrough()
+    {
+        $mapper = test_spot_mapper();
+        $data = array(
+            'title' => 'Test Post',
+            'body' => 'Test Body',
+            'widgets' => array(
+                array(
+                    'name' => 'Widget 1'
+                ),
+                array(
+                    'name' => 'Widget 2'
+                )
+            )
+        );
+        
+        $post_id = $mapper->saveNested('Entity_Post', $data);
+        $this->assertTrue($post_id !== false);
+        
+        $this->assertSame(2, $mapper->all('Entity_Post_PostsWidgets')->count());
+        $this->assertSame(2, $mapper->all('Entity_Post_Widget')->count());
+        
+        foreach ($mapper->all('Entity_Post_PostsWidgets') as $pw) {
+            $this->assertEquals($post_id, $pw->post_id);
+        }
+    }
+
+
+    public function testNestedSaveHasManyThroughError()
+    {
+        $mapper = test_spot_mapper();
+        $data = array(
+            'title' => 'Test Post',
+            'body' => 'Test Body',
+            'widgets' => array(
+                array(
+                    'name' => ''
+                ),
+                array(
+                    'name' => 'Widget 2'
+                )
+            )
+        );
+        
+        $post_id = $mapper->saveNested('Entity_Post', $data);
+        $this->assertFalse($post_id);
+        
+        $this->assertSame(0, $mapper->all('Entity_Post_PostsWidgets')->count());
+        $this->assertSame(0, $mapper->all('Entity_Post_Widget')->count());
+    }
+
+
+    public function testNestedSaveHasManyThroughLaterError()
+    {
+        $mapper = test_spot_mapper();
+        $data = array(
+            'title' => 'Test Post',
+            'body' => 'Test Body',
+            'widgets' => array(
+                array(
+                    'name' => 'Widget 1'
+                ),
+                array(
+                    'name' => ''
+                )
+            )
+        );
+        
+        $post_id = $mapper->saveNested('Entity_Post', $data);
+        $this->assertFalse($post_id);
+        
+        $this->assertSame(0, $mapper->all('Entity_Post_PostsWidgets')->count());
+        $this->assertSame(0, $mapper->all('Entity_Post_Widget')->count());
+    }
+
+
+    public function testNestedSaveHasManyThroughDontDeleteUnrelated()
+    {
+        $mapper = test_spot_mapper();
+        $data = array(
+            'title' => 'Test Post',
+            'body' => 'Test Body',
+            'widgets' => array(
+                array(
+                    'name' => 'Widget 1'
+                )
+            )
+        );
+        
+        $saved_post_id = $mapper->saveNested('Entity_Post', $data);
+        $this->assertTrue(false !== $saved_post_id);
+        $this->assertSame(1, $mapper->all('Entity_Post_PostsWidgets')->count(), $mapper->all('Entity_Post_Widget')->count());
+        
+        $data = array(
+            'title' => 'Test Post 2',
+            'body' => 'Test Body 2',
+            'widgets' => array(
+                array(
+                    'name' => ''
+                )
+            )
+        );
+        
+        $this->assertFalse($mapper->saveNested('Entity_Post', $data));
+        $this->assertSame(1, $mapper->all('Entity_Post_PostsWidgets', array('post_id' => $saved_post_id))->count(), $mapper->all('Entity_Post_Widget')->count());
     }
 }

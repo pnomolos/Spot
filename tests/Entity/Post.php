@@ -33,6 +33,13 @@ class Entity_Post extends \Spot\Entity
                 'type' => 'HasOne',
                 'entity' => 'Entity_Author',
                 'where' => array('post_id' => ':entity.id')
+            ),
+            'widgets' => array(
+                'type' => 'HasManyThrough',
+                'entity' => 'Entity_Post_Widget',
+                'throughEntity' => 'Entity_Post_PostsWidgets',
+                'throughWhere' => array('post_id' => ':entity.id'),
+                'where' => array('id' => ':throughEntity.post_widget_id'),
             )
         );
     }

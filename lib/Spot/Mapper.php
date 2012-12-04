@@ -448,7 +448,7 @@ class Mapper
                     switch ($relationOptions['type']) {
                         case 'HasOne':
                             foreach($relationOptions['where'] as $key => $value) {
-                                if(strpos(':entity.', $value) !== 0) {
+                                if(strpos($value, ':entity.') !== false) {
                                     $valueField = str_replace(':entity.', '', $value);
                                     $relationData[$key] = $baseObject->$valueField;
                                 }
@@ -459,7 +459,7 @@ class Mapper
                             $savedEntities = array();
                             foreach($relationData as $relatedData) {
                                 foreach($relationOptions['where'] as $key => $value) {
-                                    if(strpos(':entity.', $value) !== 0) {
+                                    if(strpos($value, ':entity.') !== false) {
                                         $valueField = str_replace(':entity.', '', $value);
                                         $relatedData[$key] = $baseObject->$valueField;
                                     }
@@ -468,15 +468,57 @@ class Mapper
                             }
                             if (count($relationData) != count(array_filter($savedEntities))) {
                                 $savedNested = false;
-                                $savedEntities = $this->all($relationOptions['entity'], array($this->primaryKeyField($relationOptions['entity']) => $savedEntities));
-                                foreach ($savedEntities as $savedEntity) {
-                                    $this->delete($savedEntity);
-                                }
+                                $this->delete($relationOptions['entity'], array($this->primaryKeyField($relationOptions['entity']) => $savedEntities));
                             }
                             break;
                         case 'HasManyThrough':
-                            // TODO: Not supported yet
-                            return false;
+                            $savedEntities = array();
+                            $savedThroughEntities = array();
+                            foreach($relationData as $relatedData) {
+                                // First we save the related entity so we have both sides of the
+                                // through relationship
+                                $relatedEntityId = $this->saveNested($relationOptions['entity'], $relatedData, $options);
+                                if(!$relatedEntityId) {
+                                    $this->delete($relationOptions['entity'], array(
+                                        $this->primaryKeyField($relationOptions['entity']) => $relatedEntityId
+                                    ));
+                                    break;
+                                }
+                                $savedEntities[] = $relatedEntityId;
+                                
+                                $throughEntity = new $relationOptions['throughEntity']();
+                                foreach($relationOptions['where'] as $key => $value) {
+                                    if(strpos($value, ':throughEntity.') !== false) {
+                                        $valueField = str_replace(':throughEntity.', '', $value);
+                                        $throughEntity->$valueField = $relatedEntityId;
+                                    }
+                                }
+                                foreach($relationOptions['throughWhere'] as $key => $value) {
+                                    if(strpos($value, ':entity.') !== false) {
+                                        $valueField = str_replace(':entity.', '', $value);
+                                        $throughEntity->$key = $baseObject->$valueField;
+                                    }
+                                }
+                                $throughEntityId = $this->save($throughEntity);
+                                if (!$throughEntityId) {
+                                    $this->delete($throughEntity);
+                                }
+                                $savedThroughEntities[] = $throughEntityId;
+                            } //foreach $relationData
+                            if(
+                                count($savedEntities) != count($savedThroughEntities) || 
+                                count($savedEntities) != count($relationData)
+                            ) {
+                                $savedNested = false;
+                                if (count($savedEntities)) {
+                                    $this->delete($relationOptions['entity'], array($this->primaryKeyField($relationOptions['entity']) => $savedEntities));
+                                }
+                                
+                                if (count($savedThroughEntities)) {
+                                    $this->delete($relationOptions['throughEntity'], array($this->primaryKeyField($relationOptions['throughEntity']) => $savedThroughEntities));
+                                }
+                            }
+                            break;
                     }
                 }
             }
