@@ -195,4 +195,81 @@ class Test_Query extends PHPUnit_Framework_TestCase
     $postCount = count($posts->toArray());
 		$this->assertEquals(1, $postCount);
 	}
+	
+	public function testQueryManualReset()
+	{
+		$mapper = test_spot_mapper();
+		$posts = $mapper->all('Entity_Post');
+		$this->assertEquals(10, $posts->count());
+		
+		$posts->where(array('title' => 'odd_title'));
+		$this->assertEquals(5, $posts->count());
+		
+		// We assert twice to verify that reset wasn't called internally
+		// where it shouldn't have
+		$this->assertNotEquals(10, $posts->count());
+		
+		$posts->reset();
+		
+		$this->assertEquals($posts->conditions, array());
+		$this->assertEquals(10, $posts->count());
+	}
+	
+	public function testQueryAutomaticReset() {
+		$mapper = test_spot_mapper();
+		$posts = $mapper->all('Entity_Post');
+		$this->assertEquals(10, $posts->count());
+		
+		$posts->where(array('title' => 'odd_title'));
+		$this->assertNotEquals(10, $posts->count());
+		foreach ($posts as $post) {}
+		
+		$this->assertEquals($posts->conditions, array());
+		$this->assertEquals(10, $posts->count());
+	}
+	
+	public function testQuerySnapshot()
+	{
+		$mapper = test_spot_mapper();
+		$posts = $mapper->all('Entity_Post', array('title' => 'odd_title'));
+		
+		$this->assertEquals(5, $posts->count());
+		$posts->snapshot();
+		
+		$this->assertEquals(5, $posts->count());
+		$posts->reset();
+		
+		$this->assertEquals(5, $posts->count());
+		$posts->reset($hard = true);
+		
+		$this->assertEquals(10, $posts->count());
+	}
+	
+	
+	public function testMap()
+	{
+		$mapper = test_spot_mapper();
+		$posts = $mapper->all('Entity_Post');
+		$mapped_array = $posts->map(function($p){
+			return $p->status;
+		});
+		
+		sort($mapped_array);
+		
+		$this->assertEquals(array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), $mapped_array);
+	}
+	
+	public function testFilter()
+	{
+		$mapper = test_spot_mapper();
+		$posts = $mapper->all('Entity_Post');
+		$this->assertNotEquals(1, $posts->count());
+		
+		$filtered_array = $posts->filter(function($p){
+			return $p->title == 'odd_title';
+		});
+		
+		$this->assertEquals(5, count($filtered_array));
+		
+	}
 }
