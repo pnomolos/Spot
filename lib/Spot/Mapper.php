@@ -225,7 +225,7 @@ class Mapper
             $entity = new $entityName($data);
 
             // Load relation objects
-            $this->loadRelations($entity);
+            // $this->loadRelations($entity);
 
             // Store in array for Collection
             $results[] = $entity;
@@ -236,9 +236,12 @@ class Mapper
                 $resultsIdentities[] = $pk;
             }
         }
-
+        
         $collectionClass = $this->collectionClass();
-        return new $collectionClass($results, $resultsIdentities);
+        $collection = new $collectionClass($results, $resultsIdentities);
+
+        $this->loadCollectionRelations($collection, $entityName);
+        return $collection;
     }
 
 
@@ -656,10 +659,57 @@ class Mapper
                 // Set field equal to relation class instance
                 $relationObj = new $relationClass($this, $entity, $relation);
                 $relations[$field] = $relationObj;
-                $entity->$field = $relationObj;
+                if(!isset($entity->$field)){
+                    $entity->$field = $relationObj;
+                }
             }
         }
         return $relations;
+    }
+
+
+    public function loadCollectionRelations($collection, $entityName)
+    {
+        $rels = $this->relations($entityName);
+        if(count($rels) > 0) {
+            foreach($rels as $field => $relation) {
+                if(isset($relation['lazy']) && $relation['lazy'] === false && isset($relation['child_key'])){
+                    if(method_exists($entityName, 'loadCollectionRelations')) {
+                        $check = $entityName::loadCollectionRelations($collection, $entityName, $field);
+                        if($check) {
+                            continue;
+                        }
+                    }
+                    
+                    $relationEntity = isset($relation['entity']) ? $relation['entity'] : false;
+                    if(!$relationEntity) {
+                        throw new $this->_exceptionClass("Entity for '" . $field . "' relation has not been defined.");
+                    }
+                    
+                    // Get the primary keys for each object in the collection
+                    $parentKeyField = isset($relation['parent_key']) ? $relation['parent_key'] : $this->primaryKeyField($entityName);
+                    $parentKeys = $collection->toArray($parentKeyField);
+                    
+                    foreach($this->all($relationEntity, array($relation['child_key'] => $parentKeys)) as $childEntity) {
+                        foreach($collection as $entity) {
+                            if($childEntity->{$relation['child_key']} == $entity->$parentKeyField) {
+                                if($relation['type'] == 'HasOne') {
+                                    $entity->$field = $childEntity;
+                                } else {
+                                    if(!$entity->$field) {
+                                        $entity->$field = new \Spot\Entity\Collection();
+                                    }
+                                    $entity->$field->add($childEntity);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        foreach($collection as $entity) {
+            $this->loadRelations($entity);
+        }
     }
 
 
