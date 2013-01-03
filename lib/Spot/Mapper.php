@@ -689,7 +689,6 @@ class Mapper
                     // Get the primary keys for each object in the collection
                     $parentKeyField = isset($relation['parent_key']) ? $relation['parent_key'] : $this->primaryKeyField($entityName);
                     $parentKeys = $collection->toArray($parentKeyField);
-                    error_log(print_r($parentKeys, true));
                     if (count($parentKeys)) {
                         foreach($this->all($relationEntity, array($relation['child_key'] => $parentKeys)) as $childEntity) {
                             foreach($collection as $entity) {
