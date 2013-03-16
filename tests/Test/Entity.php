@@ -30,6 +30,8 @@ class Test_Entity extends PHPUnit_Framework_TestCase
         ksort($testData);
 
         $this->assertEquals($testData, $data);
+        
+        $this->assertNull($post->asdf);
     }
 
     public function testEntitySetDataConstruct()
@@ -159,7 +161,7 @@ class Test_Entity extends PHPUnit_Framework_TestCase
         $this->title = 'A Post';
 
         $post->data(array('title' => null));
-        
+
         $this->assertTrue($post->isModified('title'));
     }
 }
